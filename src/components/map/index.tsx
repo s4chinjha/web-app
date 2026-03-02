@@ -46,6 +46,7 @@ import { MapInfoPopup } from './parts/map-info-popup';
 import { MapContextMenu } from './parts/map-context-menu';
 import { RouteHoverPopup } from './parts/route-hover-popup';
 import { TilesInfoPopup } from './parts/tiles-info-popup';
+import { RecenterControl } from './parts/recenter-control';
 import {
   VALHALLA_EDGES_LAYER_ID,
   VALHALLA_NODES_LAYER_ID,
@@ -904,6 +905,8 @@ export const MapComponent = () => {
       )}
 
       <BrandLogos />
+
+      <RecenterControl />
 
       <Button
         className="absolute bottom-10 right-3 z-10"
