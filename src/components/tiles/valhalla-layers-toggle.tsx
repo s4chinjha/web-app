@@ -8,11 +8,13 @@ import {
   VALHALLA_LAYERS,
   getValhallaSourceSpec,
 } from './valhalla-layers';
+import { useCustomLayersStore } from '@/stores/custom-layers-store';
 
 export const ValhallaLayersToggle = () => {
   const { mainMap } = useMap();
   const mapReady = useCommonStore((state) => state.mapReady);
   const [enabled, setEnabled] = useState(false);
+  const customLayers = useCustomLayersStore((state) => state.layers);
 
   useEffect(() => {
     if (!mainMap) return;
@@ -44,6 +46,24 @@ export const ValhallaLayersToggle = () => {
       for (const layer of VALHALLA_LAYERS) {
         if (!map.getLayer(layer.id)) {
           map.addLayer(layer);
+        }
+      }
+      // Re-apply any custom layers that reference the Valhalla source.
+      for (const entry of customLayers) {
+        const layerSource =
+          'source' in entry.layer ? entry.layer.source : undefined;
+        if (
+          layerSource === VALHALLA_SOURCE_ID &&
+          !map.getLayer(entry.layer.id)
+        ) {
+          try {
+            map.addLayer(entry.layer);
+            if (!entry.visible) {
+              map.setLayoutProperty(entry.layer.id, 'visibility', 'none');
+            }
+          } catch {
+            // Ignore; should not happen since the source was just added.
+          }
         }
       }
     } else {

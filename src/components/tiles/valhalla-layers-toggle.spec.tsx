@@ -29,6 +29,7 @@ const createMockMap = () => {
     removeLayer: vi.fn((id: string) => {
       delete layers[id];
     }),
+    setLayoutProperty: vi.fn(),
     on: vi.fn(),
     off: vi.fn(),
     _sources: sources,
@@ -55,10 +56,22 @@ vi.mock('@/stores/common-store', () => ({
   ),
 }));
 
+let mockCustomLayersState = {
+  layers: [] as {
+    layer: { id: string; type: string; source?: string };
+    visible: boolean;
+  }[],
+};
+
+vi.mock('@/stores/custom-layers-store', () => ({
+  useCustomLayersStore: vi.fn((selector) => selector(mockCustomLayersState)),
+}));
+
 describe('ValhallaLayersToggle', () => {
   beforeEach(() => {
     mockMap = createMockMap();
     mockMapReady = true;
+    mockCustomLayersState = { layers: [] };
     vi.clearAllMocks();
   });
 
@@ -271,6 +284,107 @@ describe('ValhallaLayersToggle', () => {
       await waitFor(() => {
         expect(screen.getByRole('switch')).not.toBeChecked();
       });
+    });
+  });
+
+  describe('custom layer re-application on enable', () => {
+    it('should re-add a custom layer referencing valhalla-tiles when toggled on', async () => {
+      const user = userEvent.setup();
+      mockCustomLayersState.layers = [
+        {
+          layer: {
+            id: 'custom-valhalla-layer',
+            type: 'line',
+            source: VALHALLA_SOURCE_ID,
+          },
+          visible: true,
+        },
+      ];
+
+      render(<ValhallaLayersToggle />);
+
+      const toggle = screen.getByRole('switch');
+      await user.click(toggle);
+
+      expect(mockMap.addLayer).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'custom-valhalla-layer' })
+      );
+    });
+
+    it('should set visibility none for an invisible custom valhalla layer when re-added', async () => {
+      const user = userEvent.setup();
+      mockCustomLayersState.layers = [
+        {
+          layer: {
+            id: 'custom-hidden-layer',
+            type: 'line',
+            source: VALHALLA_SOURCE_ID,
+          },
+          visible: false,
+        },
+      ];
+
+      render(<ValhallaLayersToggle />);
+
+      const toggle = screen.getByRole('switch');
+      await user.click(toggle);
+
+      expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+        'custom-hidden-layer',
+        'visibility',
+        'none'
+      );
+    });
+
+    it('should not re-add a custom layer that uses a different source', async () => {
+      const user = userEvent.setup();
+      mockCustomLayersState.layers = [
+        {
+          layer: {
+            id: 'custom-other-source',
+            type: 'line',
+            source: 'some-other-source',
+          },
+          visible: true,
+        },
+      ];
+
+      render(<ValhallaLayersToggle />);
+
+      const toggle = screen.getByRole('switch');
+      await user.click(toggle);
+
+      const addLayerIds = mockMap.addLayer.mock.calls.map(
+        (call: [{ id: string }]) => call[0].id
+      );
+      expect(addLayerIds).not.toContain('custom-other-source');
+    });
+
+    it('should not re-add a custom valhalla layer that is already on the map', async () => {
+      const user = userEvent.setup();
+      mockCustomLayersState.layers = [
+        {
+          layer: {
+            id: 'already-present-custom',
+            type: 'line',
+            source: VALHALLA_SOURCE_ID,
+          },
+          visible: true,
+        },
+      ];
+      mockMap._layers['already-present-custom'] = {
+        id: 'already-present-custom',
+      };
+
+      render(<ValhallaLayersToggle />);
+
+      const toggle = screen.getByRole('switch');
+      await user.click(toggle);
+
+      const addLayerIds = mockMap.addLayer.mock.calls.map(
+        (call: [{ id: string }]) => call[0].id
+      );
+      expect(addLayerIds).not.toContain('already-present-custom');
     });
   });
 });
